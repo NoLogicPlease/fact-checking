@@ -1,5 +1,4 @@
 import re
-
 import numpy as np
 import pandas as pd
 
@@ -60,10 +59,15 @@ def pre_process(dataset, filename):  # clean the dataset
     # removes punctuation and excessive spaces
     dataset = dataset.applymap(lambda x: re.sub(r'[^\w\s]', '', x))
     dataset = dataset.applymap(lambda x: re.sub(r' +', ' ', x))
+    dataset = dataset.applymap(lambda x: re.sub(r'^ +', '', x))
+    dataset = dataset.applymap(lambda x: x.lower())
 
+    labels = {'supports': 1, 'refutes': 0}
+    dataset = dataset.replace({'Label': labels})
 
     rem_elements = n_before - n_after
-    print(f"Removed {rem_elements}\t ({100 * rem_elements/n_before:.2F}%) elements because of inconsistency on {filename}")
+    print(
+        f"Removed {rem_elements}\t ({100 * rem_elements / n_before:.2F}%) elements because of inconsistency on {filename}")
     return dataset
 
 
