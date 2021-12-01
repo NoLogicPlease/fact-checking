@@ -1,7 +1,9 @@
 import torch
 from torch import optim, nn
 
+from torch.utils.data import DataLoader
 from Tokenizer import Tokenizer
+from FactDataset import FactDataset
 import gensim
 import gensim.downloader as gloader
 import pandas as pd
@@ -9,9 +11,12 @@ import pickle
 from Model import Model
 from dataset_tools import generator
 
+# GLOBALS
 EMBEDDING_DIMENSION = 50
 BATCH_SIZE = 32
 NUM_CLASSES = 2
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # LOAD GLOVE
 try:
@@ -26,41 +31,29 @@ glove_dict = emb_model.key_to_index
 glove_matrix = emb_model.vectors
 
 # LOAD CLEANED DATA
-train_pairs = pd.read_csv("dataset_cleaned/train_pairs.csv")
-val_pairs = pd.read_csv("dataset_cleaned/val_pairs.csv")
-test_pairs = pd.read_csv("dataset_cleaned/test_pairs.csv")
+train = FactDataset(EMBEDDING_DIMENSION, glove_dict, glove_matrix, 'train')
+val = FactDataset(EMBEDDING_DIMENSION, glove_dict, glove_matrix, 'val')
+test = FactDataset(EMBEDDING_DIMENSION, glove_dict, glove_matrix, 'test')
 
-train_text = train_pairs['Evidence'] + train_pairs['Claim']
-val_text = val_pairs['Evidence'] + val_pairs['Claim']
-test_text = test_pairs['Evidence'] + test_pairs['Claim']
+dataloader_train = DataLoader(dataset=train, batch_size=2, shuffle=True, num_workers=4)
+dataloader_val = DataLoader(dataset=val, batch_size=2, shuffle=True, num_workers=4)
+dataloader_test = DataLoader(dataset=test, batch_size=2, shuffle=True, num_workers=4)
 
-tokenizer = Tokenizer(train_text, EMBEDDING_DIMENSION, glove_dict, glove_matrix)
-tokenizer.tokenize()
-v2_val_to_key = tokenizer.get_val_to_key()
-v2_matrix = tokenizer.build_embedding_matrix()
+dataiter = iter(dataloader_train)
+data = dataiter.next()
+features, labels = data
+print(features)
+print(labels)
 
-tokenizer.dataset_sentences = val_text
-tokenizer.tokenize()
-v3_matrix = tokenizer.build_embedding_matrix()
-v3_val_to_key = tokenizer.get_val_to_key()
-
-tokenizer.dataset_sentences = test_text
-tokenizer.tokenize()
-v4_matrix = tokenizer.build_embedding_matrix()
-v4_val_to_key = tokenizer.get_val_to_key()
+quit()
 
 max_sen_len = 0
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model = Model(max_sen_len, EMBEDDING_DIMENSION, NUM_CLASSES)
 optimizer = optim.SGD(model.parameters(), lr=1e-3)
 criterion = nn.BCELoss()
 model = model.to(device)
 criterion = criterion.to(device)
-
-
-train_generator = next(generator(train_pairs, BATCH_SIZE, tokenizer, EMBEDDING_DIMENSION))
-
 
 
 def train(model, iterator, optimizer, criterion):

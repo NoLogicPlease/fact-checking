@@ -64,10 +64,14 @@ def pre_process(dataset, filename):  # clean the dataset
 
     labels = {'supports': 1, 'refutes': 0}
     dataset = dataset.replace({'Label': labels})
+    # removes rows with empty elements
+    dataset = dataset[dataset['Evidence'] != '']
+    dataset = dataset[dataset['Claim'] != '']
+    dataset = dataset[dataset['Label'] != '']
 
     rem_elements = n_before - n_after
-    print(
-        f"Removed {rem_elements}\t ({100 * rem_elements / n_before:.2F}%) elements because of inconsistency on {filename}")
+    print(f"Removed {rem_elements}\t ({100 * rem_elements / n_before:.2F}%)"
+          f" elements because of inconsistency on {filename}")
     return dataset
 
 
