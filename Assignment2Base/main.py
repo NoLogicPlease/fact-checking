@@ -1,85 +1,92 @@
+import os.path
+
 import torch
 from torch import optim, nn
-
 from torch.utils.data import DataLoader
-from Tokenizer import Tokenizer
-from FactDataset import FactDataset
+from torchsummary import summary
+
+import pickle
 import gensim
 import gensim.downloader as gloader
 import pandas as pd
-import pickle
-from Model import Model
-from dataset_tools import generator
+
+from Model import Model_RNN1, train_model
+from Tokenizer import Tokenizer
+from FactDataset import FactDataset
 
 # GLOBALS
 EMBEDDING_DIMENSION = 50
 BATCH_SIZE = 32
 NUM_CLASSES = 2
+EPOCHS = 10
+
+
+def load_dataset():
+    # LOAD GLOVE
+    try:
+        with open(f"glove-{EMBEDDING_DIMENSION}.pkl", 'rb') as f:
+            emb_model = pickle.load(f)
+    except Exception:
+        emb_model = gloader.load(f"glove-wiki-gigaword-{EMBEDDING_DIMENSION}")
+        with open(f"glove-{EMBEDDING_DIMENSION}.pkl", 'wb') as f:
+            pickle.dump(emb_model, f)
+
+    glove_dict = emb_model.key_to_index
+    glove_matrix = emb_model.vectors
+
+    # LOAD CLEANED DATA IN TORCH DATASET OBJECTS
+    splits = {}
+    for split in ['train', 'val', 'test']:
+        try:
+            with open(f"{os.path.join('dataset_torched', split)}.pkl", 'rb') as f:
+                splits[split] = pickle.load(f)
+        except Exception:
+            splits[split] = FactDataset(EMBEDDING_DIMENSION, glove_dict, glove_matrix, split)
+            with open(f"{os.path.join('dataset_torched', split)}.pkl", 'wb') as f:
+                pickle.dump(splits[split], f)
+
+    return splits
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# LOAD GLOVE
-try:
-    with open(f"glove-{EMBEDDING_DIMENSION}.pkl", 'rb') as f:
-        emb_model = pickle.load(f)
-except Exception:
-    emb_model = gloader.load(f"glove-wiki-gigaword-{EMBEDDING_DIMENSION}")
-    with open(f"glove-{EMBEDDING_DIMENSION}.pkl", 'wb') as f:
-        pickle.dump(emb_model, f)
+splits = load_dataset()
+train, val, test = splits['train'], splits['val'], splits['test']
+dataloader_train = DataLoader(dataset=train, batch_size=BATCH_SIZE, num_workers=4, shuffle=True)
+dataloader_val = DataLoader(dataset=val, batch_size=BATCH_SIZE, num_workers=4, shuffle=True)
+dataloader_test = DataLoader(dataset=test, batch_size=BATCH_SIZE, num_workers=4, shuffle=True)
 
-glove_dict = emb_model.key_to_index
-glove_matrix = emb_model.vectors
+dataiter_train = iter(dataloader_train)
+dataiter_val = iter(dataloader_val)
+dataiter_test = iter(dataloader_test)
 
-# LOAD CLEANED DATA
-train = FactDataset(EMBEDDING_DIMENSION, glove_dict, glove_matrix, 'train')
-val = FactDataset(EMBEDDING_DIMENSION, glove_dict, glove_matrix, 'val')
-test = FactDataset(EMBEDDING_DIMENSION, glove_dict, glove_matrix, 'test')
+print(torch.tensor(train.emb_matrix, device=device))
 
-dataloader_train = DataLoader(dataset=train, batch_size=2, shuffle=True, num_workers=4)
-dataloader_val = DataLoader(dataset=val, batch_size=2, shuffle=True, num_workers=4)
-dataloader_test = DataLoader(dataset=test, batch_size=2, shuffle=True, num_workers=4)
-
-dataiter = iter(dataloader_train)
-data = dataiter.next()
-features, labels = data
-print(features)
-print(labels)
-
-quit()
-
-max_sen_len = 0
-
-model = Model(max_sen_len, EMBEDDING_DIMENSION, NUM_CLASSES)
+model_params = {
+    'sentence_len': train.max_seq_len,
+    'embedding_dim': EMBEDDING_DIMENSION,
+    'output_dim': NUM_CLASSES,
+    'pre_trained_emb': torch.tensor(train.emb_matrix, device=device)
+}
+model = Model_RNN1(**model_params)
 optimizer = optim.SGD(model.parameters(), lr=1e-3)
-criterion = nn.BCELoss()
+loss = nn.BCELoss()
+
 model = model.to(device)
-criterion = criterion.to(device)
+loss = loss.to(device)
 
+#summary(model, (2, 50, 90), BATCH_SIZE)
+#quit()
 
-def train(model, iterator, optimizer, criterion):
-    epoch_loss = 0
-    epoch_acc = 0
+training_info = {
+    'model': model,
+    'epochs': EPOCHS,
+    'batch_size': BATCH_SIZE,
+    'iterator_train': dataiter_train,
+    'iterator_validation': dataiter_val,
+    'optimizer': optimizer,
+    'loss': loss,
+    'num_train_samples': train.n_samples
+}
 
-    model.train()
-    for batch in iterator:
-        optimizer.zero_grad()
-        predictions = model(batch.text).squeeze(1)
-        loss = criterion(predictions, batch.label)
-        acc = binary_accuracy(predictions, batch.label)
-        loss.backward()
-        optimizer.step()
-        epoch_loss += loss.item()
-        epoch_acc += acc.item()
-
-    return epoch_loss / len(iterator), epoch_acc / len(iterator)
-
-
-def binary_accuracy(preds, y):
-    """
-    Returns accuracy per batch, i.e. if you get 8/10 right, this returns 0.8, NOT 8
-    """
-
-    rounded_preds = torch.round(torch.sigmoid(preds))
-    correct = (rounded_preds == y).float()
-    acc = correct.sum() / len(correct)
-    return acc
+train_model(**training_info)

@@ -51,8 +51,10 @@ def pre_process(dataset, filename):  # clean the dataset
     # remove square brackets and what they contain
     dataset['Evidence'] = dataset['Evidence'].apply(lambda x: re.sub(r'-LSB-.*-RSB-', '', x))
 
-    # remove all rows where there are single brackets in the evidence
     n_before = dataset.shape[0]
+    # removes instances longer than a threshold on evidence
+    dataset = dataset[dataset['Evidence'].str.split().str.len() <= 100]
+    # remove all rows where there are single brackets in the evidence
     dataset = dataset[~dataset['Evidence'].str.contains('|'.join(['-LRB-', '-LSB-', '-RRB-', '-RSB-']))]
     n_after = dataset.shape[0]
 
@@ -68,6 +70,8 @@ def pre_process(dataset, filename):  # clean the dataset
     dataset = dataset[dataset['Evidence'] != '']
     dataset = dataset[dataset['Claim'] != '']
     dataset = dataset[dataset['Label'] != '']
+
+
 
     rem_elements = n_before - n_after
     print(f"Removed {rem_elements}\t ({100 * rem_elements / n_before:.2F}%)"

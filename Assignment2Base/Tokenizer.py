@@ -30,10 +30,10 @@ class Tokenizer(object):
             if self.embedding_matrix is not None:
                 self.key_to_value[i + len(self.embedding_matrix)] = word  # build two dictionaries for key value correspondence
                 self.value_to_key[word] = i + len(self.embedding_matrix)
-                self.value_to_key_new[word] = i
             else:
                 self.key_to_value[i] = word  # build two dictionaries for key value correspondence
                 self.value_to_key[word] = i
+            self.value_to_key_new[word] = i
 
         self.num_unique_words = len(new_unique)
         self.unique_words = self.unique_words | new_unique  # union of unique words and new unique words
@@ -43,6 +43,7 @@ class Tokenizer(object):
         oov_words = []
         tmp_embedding_matrix = np.zeros((self.num_unique_words, self.embedding_dim), dtype=np.float32)
         len_old_emb_matrix = len(self.embedding_matrix) if self.embedding_matrix is not None else 0
+        print(f"Finding OOVs: ")
         for word, idx in tqdm(self.value_to_key_new.items()):
             try:
                 embedding_vector = self.glove_matrix[self.glove_dict[word]]
@@ -57,7 +58,17 @@ class Tokenizer(object):
 
     def build_embedding_matrix(self):
         oov_words = self.__build_embedding_matrix_glove()
-        for word, idx in oov_words:
+        print(f"Solving OOVs: ")
+        for word, idx in tqdm(oov_words):
+            embedding_vector = np.random.uniform(low=-0.05, high=0.05, size=self.embedding_dim)
+            self.embedding_matrix[idx] = embedding_vector
+        return copy.deepcopy(self.embedding_matrix)
+
+'''    
+    def build_embedding_matrix(self):
+        oov_words = self.__build_embedding_matrix_glove()
+        print(f"Solving OOVs: \n")
+        for word, idx in tqdm(oov_words):
             neighbour_words = []
             for sen in self.dataset_sentences:  # look for word in sentence
                 for i, wanted_word in enumerate(sen):
@@ -79,3 +90,7 @@ class Tokenizer(object):
                 embedding_vector = np.mean(avg_matrix[:length_in_vocab], axis=0)
             self.embedding_matrix[idx] = embedding_vector
         return copy.deepcopy(self.embedding_matrix)
+'''
+
+
+
