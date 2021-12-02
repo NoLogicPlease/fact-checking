@@ -40,8 +40,8 @@ class FactDataset(Dataset):
             for word in evid_sen.split():
                 sentence[1].append(self.val_to_key[word])
 
-            sentence[0] = sentence[0] + [-1] * (self.max_seq_len - len(claim_sen.split()))
-            sentence[1] = sentence[1] + [-1] * (self.max_seq_len - len(evid_sen.split()))
+            sentence[0] = sentence[0] + [0] * (self.max_seq_len - len(claim_sen.split()))
+            sentence[1] = sentence[1] + [0] * (self.max_seq_len - len(evid_sen.split()))
             self.x.append(sentence)
 
         self.x = torch.tensor(self.x)
