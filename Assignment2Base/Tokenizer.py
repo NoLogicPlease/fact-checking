@@ -62,6 +62,18 @@ class Tokenizer(object):
         for word, idx in tqdm(oov_words):
             embedding_vector = np.random.uniform(low=-0.05, high=0.05, size=self.embedding_dim)
             self.embedding_matrix[idx] = embedding_vector
+
+        # PADDING (feat. David Guetta)
+        first = self.embedding_matrix[0]
+        if np.count_nonzero(first) == 0:
+            first = self.embedding_matrix[0]
+            self.embedding_matrix[0] = np.zeros(self.embedding_dim)
+            self.embedding_matrix = np.vstack((self.embedding_matrix, first))
+
+            word_to_change = min(self.value_to_key.items(), key=lambda x: x[1])[0]
+            self.value_to_key[word_to_change] = len(self.embedding_matrix) - 1
+            self.key_to_value[len(self.embedding_matrix) - 1] = word_to_change
+
         return copy.deepcopy(self.embedding_matrix)
 
 '''    

@@ -1,5 +1,6 @@
 import os.path
 
+import numpy as np
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
@@ -49,6 +50,7 @@ def load_dataset():
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device = torch.device('cpu')
 
 splits = load_dataset()
 train, val, test = splits['train'], splits['val'], splits['test']
@@ -60,23 +62,25 @@ dataiter_train = iter(dataloader_train)
 dataiter_val = iter(dataloader_val)
 dataiter_test = iter(dataloader_test)
 
-print(torch.tensor(train.emb_matrix, device=device))
+# print(torch.tensor(train.emb_matrix, device=device))
+print(max(train.val_to_key.values()))
+print(train.emb_matrix.shape)
 
 model_params = {
     'sentence_len': train.max_seq_len,
     'embedding_dim': EMBEDDING_DIMENSION,
     'output_dim': NUM_CLASSES,
-    'pre_trained_emb': torch.tensor(train.emb_matrix, device=device)
+    'pre_trained_emb': torch.tensor(train.emb_matrix).to(device)
 }
 model = Model_RNN1(**model_params)
 optimizer = optim.SGD(model.parameters(), lr=1e-3)
-loss = nn.BCELoss()
+loss = nn.BCEWithLogitsLoss()
 
 model = model.to(device)
 loss = loss.to(device)
 
-#summary(model, (2, 50, 90), BATCH_SIZE)
-#quit()
+# summary(model, (2, 90), batch_size=32)
+# quit()
 
 training_info = {
     'model': model,
